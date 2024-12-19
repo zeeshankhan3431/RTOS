@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include <linux/sched.h>  // Include this header for sched_attr and SCHED_DEADLINE
 
 #define SIMULATION_TIME 50  // Simulation duration
 
@@ -131,4 +132,3 @@ int main() {
 
     return 0;
 }
-
