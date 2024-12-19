@@ -1,30 +1,43 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <sched.h>
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
-#include <linux/sched.h>  // Include this header for sched_attr and SCHED_DEADLINE
+#include <linux/sched.h>
+#include <sys/syscall.h>
 
-#define SIMULATION_TIME 50  // Simulation duration
+#define SIMULATION_TIME 50  // Simulation duration in time units
 
 // Task structure
 typedef struct {
     char name[10];      // Task name
-    int capacity;       // Execution time
-    int deadline;       // Relative deadline
-    int period;         // Period
+    int capacity;       // Execution time (Ci)
+    int deadline;       // Relative deadline (Di)
+    int period;         // Period (Ti)
     int remaining_time; // Remaining execution time in the current period
     int next_deadline;  // Absolute deadline
 } Task;
 
-// Task parameters for SCHED_DEADLINE
-struct sched_param_deadline {
-    int sched_runtime;    // task runtime in nanoseconds
-    int sched_deadline;   // task deadline in nanoseconds
-    int sched_period;     // task period in nanoseconds
+// sched_attr structure (if not defined in headers)
+struct sched_attr {
+    unsigned int size;
+    unsigned int sched_policy;
+    unsigned long sched_flags;
+    unsigned long sched_nice;
+    unsigned long sched_priority;
+    unsigned long sched_runtime;
+    unsigned long sched_deadline;
+    unsigned long sched_period;
 };
 
+// sched_setattr syscall wrapper
+int sched_setattr(pid_t pid, const struct sched_attr *attr, unsigned int flags) {
+    return syscall(314, pid, attr, flags);  // syscall number 314 for sched_setattr
+}
+
+// Initialize tasks for simulation
 void initialize_tasks(Task tasks[], int n) {
     for (int i = 0; i < n; i++) {
         tasks[i].remaining_time = tasks[i].capacity;
@@ -32,6 +45,7 @@ void initialize_tasks(Task tasks[], int n) {
     }
 }
 
+// Find the next task to run based on EDF
 int find_next_task(Task tasks[], int n, int time) {
     int earliest_deadline = 1e9, selected_task = -1;
     for (int i = 0; i < n; i++) {
@@ -43,6 +57,7 @@ int find_next_task(Task tasks[], int n, int time) {
     return selected_task;
 }
 
+// Simulate EDF scheduling
 void edf_schedule(Task tasks[], int n) {
     printf("Time\tRunning Task\n");
     printf("-------------------\n");
@@ -75,16 +90,18 @@ void edf_schedule(Task tasks[], int n) {
     }
 }
 
+// Set SCHED_DEADLINE policy for a task
 int set_task_deadline_policy(Task *task, int runtime, int deadline, int period) {
-    struct sched_attr attr;
+    struct sched_attr attr = {0};
 
-    // Set the scheduling parameters for the task
+    // Set the scheduling parameters
+    attr.size = sizeof(attr);
     attr.sched_policy = SCHED_DEADLINE;
-    attr.sched_runtime = runtime;  // Set the runtime in nanoseconds
-    attr.sched_deadline = deadline; // Set the deadline in nanoseconds
-    attr.sched_period = period;    // Set the period in nanoseconds
+    attr.sched_runtime = runtime * 1e6;   // Convert to nanoseconds
+    attr.sched_deadline = deadline * 1e6; // Convert to nanoseconds
+    attr.sched_period = period * 1e6;    // Convert to nanoseconds
 
-    // Apply the deadline policy using sched_setattr
+    // Apply the SCHED_DEADLINE policy
     if (sched_setattr(0, &attr, 0) == -1) {
         perror("Error setting SCHED_DEADLINE policy");
         return -1;
@@ -96,7 +113,7 @@ int set_task_deadline_policy(Task *task, int runtime, int deadline, int period) 
 int main() {
     int n;
 
-    // Get number of tasks
+    // Get the number of tasks
     printf("Enter the number of tasks: ");
     scanf("%d", &n);
 
