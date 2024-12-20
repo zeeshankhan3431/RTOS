@@ -13,7 +13,7 @@
 typedef struct {
     int task_no;      // Task number
     int core_id;      // Core to run on
-    long latencies[ITERATIONS]; // Latency values
+    long latencies[ITERATIONS]; // Latency values in nanoseconds
 } TaskData;
 
 // Calculate the difference in nanoseconds between two timespecs
@@ -48,8 +48,8 @@ void *real_time_task(void *arg) {
         clock_gettime(CLOCK_MONOTONIC, &current_time);
         data->latencies[i] = calculate_latency(next_activation, current_time);
 
-        // Print execution info
-        printf("Task %d\tCore %d\t%ld ns\n", data->task_no, data->core_id, data->latencies[i]);
+        // Print execution info (convert latency to seconds)
+        printf("Task %d\tCore %d\t%.9f s\n", data->task_no, data->core_id, (double)data->latencies[i] / NANOSECONDS_PER_SECOND);
     }
 
     return NULL;
@@ -80,7 +80,7 @@ int main() {
     }
 
     // Calculate and display statistics
-    printf("\nCore\tMin Latency (ns)\tMax Latency (ns)\tAvg Latency (ns)\n");
+    printf("\nCore\tMin Latency (s)\tMax Latency (s)\tAvg Latency (s)\n");
     for (int i = 0; i < num_tasks; i++) {
         long min_latency = task_data[i].latencies[0];
         long max_latency = task_data[i].latencies[0];
@@ -96,9 +96,12 @@ int main() {
             total_latency += task_data[i].latencies[j];
         }
 
-        printf("%d\t%ld\t\t%ld\t\t%ld\n", i, min_latency, max_latency, total_latency / ITERATIONS);
+        // Display latencies in seconds (s)
+        printf("%d\t%.9f\t%.9f\t%.9f\n", i,
+               (double)min_latency / NANOSECONDS_PER_SECOND,
+               (double)max_latency / NANOSECONDS_PER_SECOND,
+               (double)(total_latency / ITERATIONS) / NANOSECONDS_PER_SECOND);
     }
 
     return EXIT_SUCCESS;
 }
-
